@@ -1,0 +1,337 @@
+################################
+# ABM-Case 2018/19 Documentation
+################################
+# Additional packages used: 
+library(dplyr)
+library(stargazer)
+library(ggplot2)
+library(readr)
+library(ggpubr)
+library(FSA)
+library(car)
+
+# Open dataset given by the case
+ABM_2018_2019_Case_Data <- read.csv("ABM_2018_2019_Case_Data.csv")
+View(ABM_2018_2019_Case_Data)
+# Define dataset 'case' containing all data
+case <- ABM_2018_2019_Case_Data
+# Check for missing values
+case.missing <- case[!complete.cases(case), ]
+View(case.missing)
+# Remove all observations with at least one missing value
+case <- case[complete.cases(case), ]
+
+######################
+# Descriptive analysis
+######################
+# For further analyses we define a dataset containing all continiuous variables----
+case.continuous <- select(case, 2:5)
+
+# Identify outliers of continuous variables and create values
+outliermeanuser <- boxplot(case.continuous$mean_user)$out
+outliermeancritic <- boxplot(case.continuous$mean_critic)$out
+outliervoluser <- boxplot(case.continuous$vol_user)$out
+outliervolcritic <- boxplot(case.continuous$vol_critic)$out
+
+# Summary table of continuous variables with Stargazer -> more needed?
+stargazer(case.continuous, type="html", median=TRUE ,out="case.continuous.table.doc")
+# Summary table of continuous variables with Stargazer and without outliers 
+meanuser.WO <- select(case.continuous[!(case.continuous$mean_user %in% outliermeanuser), ],1)
+voluser.WO <- select(case.continuous[!(case.continuous$vol_user %in% outliervoluser), ],2)
+meancritic.WO <- select(case.continuous[!(case.continuous$mean_critic %in% outliermeancritic), ],3)
+volcritic.WO <- select(case.continuous[!(case.continuous$vol_critic %in% outliervolcritic), ],4)
+stargazer(meanuser.WO, voluser.WO, meancritic.WO, volcritic.WO, type="html", median=TRUE,
+          out="case.continuous.WO.table.doc")
+rm(meanuser.WO,meancritic.WO,voluser.WO,volcritic.WO)
+
+# Display continuous variables in boxplots without outliers
+boxplot(case.continuous$mean_user,main="Boxplot of mean user ratings", 
+        xlab="Mean user ratings", horizontal=TRUE,axes=TRUE,outline=TRUE)
+boxplot(case.continuous$mean_critic,main="Boxplot of mean critic ratings", 
+        xlab="Mean critic ratings", horizontal=TRUE,axes=TRUE,outline=FALSE)
+boxplot(case.continuous$vol_user,main="Boxplot of volume user ratings", 
+        xlab="Volume user ratings", horizontal=TRUE,axes=TRUE,outline=TRUE)
+boxplot(case.continuous$vol_critic,main="Boxplot of volume critic ratings", 
+        xlab="Volume critic ratings", horizontal=TRUE,axes=TRUE,outline=FALSE)
+# Export boxplots as PNGs
+
+# ESRB ratings piechart
+pie(table(case$ESRB_rating), main='ESRB Ratings', 
+    labels=c('All','+10','+13','+17','No rating'))
+# Export piechart as PNG
+
+# Genre displayed in barchart
+barplot(table(case$genre), main='Distribution of genres', 
+        names.arg=c('Action','Adventure','Strategy','Role-playing','Others'),
+        ylab = 'Number of games', 
+        col=c('#F4A582', '#FDDBC7', '#D1E5F0', '#92C5DE', '#4393C3'))
+# Export barchart as PNG
+
+# Binary variables in piechart
+pie(table(case$weekend_release), main='Weekend release?', labels = c('No','Yes'))
+pie(table(case$major_studio), main='Major studio?', labels = c('No','Yes'))
+pie(table(case$multiplayers), main='Multi-player?', labels = c('No','Yes'))
+
+# Volume game mods
+# Mods available or not?
+case.mods <- select(case, c(11)) 
+# Selecting values that are non-zero
+case.mods <- filter(case.mods, vol_mods != 0) 
+# Piechart: Mods available?
+percentlabels <- c((100*round(nrow(case.mods)/4777, digits = 3)), 
+                   (round(100*(4777-nrow(case.mods))/4777, digits = 1)))
+lbls <- c('Yes','No')
+lbls <- paste(lbls, percentlabels) # add percents to labels 
+lbls <- paste(lbls,"%",sep="") # ad % to labels 
+pie(x = percentlabels,labels = lbls , main = 'Mods available?')
+
+# Summary table of non-zero values
+outliermods <- boxplot(case.mods$vol_mods)$out
+case.mods.WO <- case.mods[!(case.mods$vol_mods %in% outliermods), ]
+# Sensitivity analysis
+# Including outliers
+stargazer(case.mods, type="html", median=TRUE ,out="case.mods.table.doc")
+# Excluding outiers
+stargazer(as.data.frame(case.mods.WO), type="html", median=TRUE ,out="case.mods.WO.table.doc")
+# Boxplot of non-zero values and without outliers
+boxplot(case.mods,main="Boxplot of volume of game mods (excl. outliers)", 
+        horizontal=TRUE,axes=TRUE,outline=F)
+rm(case.mods.WO)
+
+# Create scatterplot displaying means of user ratings and means of critics
+# Define dataset 'case.mean'
+case.mean <- select(case, c(2,4))
+# Scatterplot 'User rating vs. critic rating'
+plot(case.mean$mean_user, case.mean$mean_critic, main='User rating vs. critic rating', 
+     pch=4, xlab='Mean user rating', ylab='Mean critic rating')
+# Export and save created scatterplot as PNG
+
+
+################################
+# Pairwise relationship analysis
+################################
+# Volume of user ratings ----
+cor.test(case$mean_user, case$vol_user, method="pearson")
+shapiro.test(case$mean_user)
+shapiro.test(case$vol_user)
+cor.test(case$mean_user, case$vol_user, method="spearman")
+
+# Mean of critic ratings
+cor.test(case$mean_user, case$mean_critic, method="pearson")
+shapiro.test(case$mean_user)
+shapiro.test(case$mean_critic)
+cor.test(case$mean_user, case$mean_critic, method="spearman")
+
+# Volume of critic ratings
+cor.test(case$mean_user, case$vol_critic, method="pearson")
+shapiro.test(case$mean_user)
+shapiro.test(case$vol_critic)
+cor.test(case$mean_user, case$vol_critic, method="spearman")
+
+# ESRB rating - Do the means of user ratings differ?
+case.ESRB <- select(case, 2,6)
+case.ESRB$ESRB <- factor(case.ESRB$ESRB, 
+                           levels=c("1","2","3","4","5"), 
+                           labels=c("All ages","10+","13+","17+","No rating"))
+ggline(case.ESRB, x="ESRB", y="mean_user", add="mean", ylim = c(65, 75), 
+       xlab = "ESRB Rating", ylab="Mean User", ggtheme=theme_pubclean())
+# One-way ANOVA
+result.aov <- aov(mean_user ~ ESRB,data = case.ESRB)
+summary(result.aov)
+TukeyHSD(result.aov)
+# Assumption 1: Variances are equal
+fligner.test(mean_user ~ ESRB, data = case.ESRB)
+# Assumption 2: Each population is normally distributed
+shapiro.test(case.ESRB$mean_user[case.ESRB$ESRB =="All ages"])
+shapiro.test(case.ESRB$mean_user[case.ESRB$ESRB =="10+"])
+shapiro.test(case.ESRB$mean_user[case.ESRB$ESRB =="13+"])
+shapiro.test(case.ESRB$mean_user[case.ESRB$ESRB =="17+"])
+shapiro.test(case.ESRB$mean_user[case.ESRB$ESRB =="No rating"])
+# Assumption 2 is violated -> use of non-parametric alternative 
+kruskal.test(mean_user ~ ESRB, data = case.ESRB)
+dunnTest(mean_user ~ ESRB, data = case.ESRB)
+rm(case.ESRB, result.aov)
+
+# Game genre - Do the means of user ratings differ? 
+hist(case$mean_user, main='Histogram of purchase intention', breaks=20, 
+     xlab='Mean of user ratings')
+case.genre <- select(case, 2,7)
+case.genre$genre <- factor(case.genre$genre, 
+                           levels=c("1","2","3","4","5"), 
+                           labels=c("Action","Adventure","Strategy","Role-playing",
+                                    "Others"))
+# Use one-way ANOVA to see whether means differ
+result.aov <- aov(mean_user ~ genre, data=case.genre)
+summary(result.aov)
+TukeyHSD(result.aov)
+ggline(case.genre, x="genre", y="mean_user", add="mean", ylim = c(65, 75), 
+       xlab = "Genre", ylab="Mean User", ggtheme=theme_pubclean())
+# Assumption 1: Variances are equal
+fligner.test(mean_user ~ genre, data = case.genre)
+# Assumption 2: Each population is normally distributed
+shapiro.test(case.genre$mean_user[case.genre$genre =="Action"])
+shapiro.test(case.genre$mean_user[case.genre$genre =="Adventure"])
+shapiro.test(case.genre$mean_user[case.genre$genre =="Strategy"])
+shapiro.test(case.genre$mean_user[case.genre$genre =="Role-playing"])
+shapiro.test(case.genre$mean_user[case.genre$genre =="Others"])
+# Assumption 2 is violated -> use of non-parametric alternative 
+kruskal.test(mean_user ~ genre, data = case.genre)
+dunnTest(mean_user ~ genre, data = case.genre)
+rm(case.genre, result.aov)
+
+# Weekend release 
+# Two-sample t-test to see if means differ
+case.weekend <- select(case, 2,8)
+case.weekend$weekend_release <- factor(case.weekend$weekend_release,
+                                       levels = c("0","1"),
+                                       labels = c("No","Yes"))
+# Assumption 1: Variances are equal
+fligner.test(mean_user ~ weekend_release, data = case.weekend)
+# Assumption 1 holds
+t.test(mean_user ~ weekend_release, data = case.weekend, var.equal=TRUE)
+# Assumption 2: Each population is normally distributed
+shapiro.test(case.weekend$mean_user[case.weekend$weekend_release =="No"])
+shapiro.test(case.weekend$mean_user[case.weekend$weekend_release =="Yes"])
+# Assumption 2 is violated -> use of non-parametric alternative (Wilcoxon Rank Sum Test)
+wilcox.test(mean_user ~ weekend_release, data = case.weekend)
+rm(case.weekend)
+
+# Major studio games
+# Two-sample t-test to see if means differ
+case.major <- select(case, 2,9)
+case.major$major_studio <- factor(case.major$major_studio,
+                                  levels = c("0","1"),
+                                  labels = c("No","Yes"))
+# Assumption 1: Variances are equal
+fligner.test(mean_user ~ major_studio, data = case.major)
+# Assumption 1 does not hold
+t.test(mean_user ~ major_studio, data = case.major, var.equal=FALSE)
+# Assumption 2: Each population is normally distributed
+shapiro.test(case.major$mean_user[case.major$major_studio =="No"])
+shapiro.test(case.major$mean_user[case.major$major_studio =="Yes"])
+# Assumption 1&2 are violated -> use of non-parametric alternative 
+# Wilcoxon Rank Sum Test
+wilcox.test(mean_user ~ major_studio, data = case.major)
+rm(case.major)
+
+
+# Multiplayer games
+# Two-sample t-test to see if means differ
+case.multi <- select(case, 2,10)
+case.multi$multiplayers <- factor(case.multi$multiplayers,
+                                  levels = c("0","1"),
+                                  labels = c("No","Yes"))
+# Assumption 1: Variances are equal
+fligner.test(mean_user ~ multiplayers, data = case.multi)
+# Assumption 1 does not hold
+t.test(mean_user ~ multiplayers, data = case.multi, var.equal=FALSE)
+# Assumption 2: Each population is normally distributed
+shapiro.test(case.multi$mean_user[case.multi$multiplayers =="No"])
+shapiro.test(case.multi$mean_user[case.multi$multiplayers =="Yes"])
+# Assumption 1&2 are violated -> use of non-parametric alternative 
+# Wilcoxon Rank Sum Test
+wilcox.test(mean_user ~ multiplayers, data = case.multi)
+rm(case.multi)
+
+# Volume of game mods
+case.mods <- select(case, 2,11)
+# Test whether the availability (Yes or no) has an impact on the mean
+case.mods <- mutate(case.mods, available=ifelse(vol_mods > 0, 1, 0))
+case.mods$available <- factor(case.mods$available,
+                              levels = c("0","1"),
+                              labels = c("No","Yes"))
+# Assumption 1: Variances are equal
+fligner.test(mean_user ~ available, data = case.mods)
+# Assumption 1 does not hold
+t.test(mean_user ~ available, data = case.mods, var.equal=FALSE)
+# Assumption 2: Each population is normally distributed
+shapiro.test(case.mods$mean_user[case.mods$available =="No"])
+shapiro.test(case.mods$mean_user[case.mods$available =="Yes"])
+# Assumption 2 is violated -> use of non-parametric alternative
+wilcox.test(mean_user ~ available, data = case.mods)
+
+# Test whether the number of available mods and the mean user rating are related
+# As more than 95% of the values are zero, we only include positive values
+case.mods <- filter(case.mods, vol_mods != 0) 
+cor.test(case.mods$mean_user, case.mods$vol_mods, method="pearson")
+# Assumption 1: Values are normally distributed
+shapiro.test(case.mods$mean_user)
+shapiro.test(case.mods$vol_mods)
+# Assumption 1 does not hold -> use of non-parametric test
+cor.test(case.mods$mean_user, case.mods$vol_mods, method="spearman")
+rm(case.mods)
+
+######################
+# Interaction analysis
+######################
+# Genres & multiplayers
+case.genre.multi <- select(case, 2, 7, 10)
+case.genre.multi$genre <- factor(case.genre.multi$genre, 
+                           levels=c("1","2","3","4","5"), 
+                           labels=c("Action","Adventure","Strategy","Role-playing",
+                                    "Others"))
+case.genre.multi$multiplayers <- factor(case.genre.multi$multiplayers,
+                                  levels = c("0","1"),
+                                  labels = c("No","Yes"))
+result.2aov <- aov(mean_user ~ genre + multiplayers + 
+                     genre:multiplayers, data = case.genre.multi)
+summary(result.2aov)
+ggline(case.genre.multi, x="genre", y="mean_user", linetype="multiplayers", 
+       add="mean", ylim = c(65, 75), xlab = "Genre", ylab = "Mean user rating",
+       ggtheme=theme_pubclean(), color = "multiplayers", palette = c("#00AFBB", "#E7B800"))
+rm(case.genre.multi, result.2aov)
+
+# Mean critic & major studio
+case.critic.studio <- select(case, 2, 4, 9)
+case.critic.studio$major_studio <- factor(case.critic.studio$major_studio,
+                                         levels = c("0","1"),
+                                         labels = c("No","Yes"))
+result.2aov <- aov(mean_user ~ mean_critic + major_studio + mean_critic:major_studio, data = case.critic.studio)
+summary(result.2aov)
+ggline(case.critic.studio, x="mean_critic", y="mean_user", linetype="major_studio",
+       add = "mean", ylim=c(0,100), xlab = "Mean of critic ratings", ylab = "Mean of user ratings",
+       ggtheme = theme_pubclean(), color = "major_studio", palette = c("#00AFBB", "#E7B800"))
+rm(case.critic.studio, result.2aov)
+
+############################
+# Multiple Linear Regression
+############################
+# Model I
+case.reg <- case
+case.reg$ESRB_rating <- factor(case.reg$ESRB_rating)
+case.reg$genre <- factor(case.reg$genre)
+case.reg$weekend_release <- factor(case.reg$weekend_release)
+case.reg$major_studio <- factor(case.reg$major_studio)
+case.reg$multiplayers <- factor(case.reg$multiplayers)
+modelA <- (mean_user ~ vol_user + mean_critic + vol_critic + ESRB_rating
+           + genre + weekend_release + major_studio + multiplayers + vol_mods)
+resultA <- lm(formula = modelA, data = case.reg)
+summary(resultA)
+
+# Use a different level as the baseline
+levels(case.reg$genre)
+case.reg$genre <- factor(case.reg$genre,
+                         levels=(c("2","1","3","4","5")))
+levels(case.reg$genre)
+resultA.2 <- lm(formula = modelA, data = case.reg)
+summary(resultA.2)
+levels(case.reg$genre)
+case.reg$genre <- factor(case.reg$genre,
+                         levels=(c("1","2","3","4","5")))
+# Residual analysis
+hist(residuals(resultA), breaks=50)
+plot(resultA, 1, pch=19, cex =.3)
+shapiro.test(resultA$residuals)
+ncvTest(resultA)
+vif(resultA)
+
+# Continuous and categorical variable -> Model II
+modelB <- (mean_user ~ vol_user + mean_critic + mean_critic:major_studio + vol_critic 
+           + ESRB_rating + genre + weekend_release + major_studio + multiplayers + vol_mods)
+resultB <- lm(formula=modelB, data=case.reg)
+summary(resultB)
+
+# Export data with stargazer
+stargazer(resultA, resultB, type="html", no.space=TRUE,
+          out="Multiple linear regression.doc")
+rm(case.reg, resultA, resultA.2, resultB,  modelA, modelB)
