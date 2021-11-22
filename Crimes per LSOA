@@ -1,0 +1,200 @@
+install.packages("sf")
+install.packages("tmap")
+install.packages("dplyr")
+library(sf)
+library(tmap)
+library(dplyr)
+
+crimes <- read.csv("https://raw.githubusercontent.com/maczokni/2018_labs/master/data/2017-11-greater-manchester-street.csv")
+shp_name <- "BoundaryData/england_lsoa_2011.shp"
+manchester_lsoa <- st_read(shp_name)
+
+crimes_per_lsoa <- crimes %>%
+  select(LSOA.code) %>%
+  group_by(LSOA.code) %>%
+  summarise(count=n())
+manchester_lsoa <- left_join(manchester_lsoa, crimes_per_lsoa, by = c("code"="LSOA.code"))
+
+st_write(manchester_lsoa, "BoundaryData/manchester_crime_lsoa.shp")
+
+#tm_shape(manchester_lsoa)
+
+tmap_mode("plot")
+tm_shape(manchester_lsoa) + 
+  tm_polygons()
+tm_shape(manchester_lsoa) + 
+  tm_polygons("count")
+tm_shape(manchester_lsoa) + 
+  tm_fill("count")
+tm_shape(manchester_lsoa) + 
+  tm_fill("count") +
+  tm_borders(alpha = 0.1)
+tm_shape(manchester_lsoa) + 
+  tm_fill("count", title = "Crime counts") +
+  tm_borders(alpha = 0.1) +
+  tm_layout(main.title = "Crime in Manchester City, Nov/2017", main.title.size = 0.7 ,
+            legend.position = c("right", "bottom"), legend.title.size = 0.8)
+
+current_style <- tmap_style("col_blind")
+
+map1 <- tm_shape(manchester_lsoa) +                   #use tm_shape function to specify spatial object
+  tm_fill("count", style="equal", title = "Equal") +  #use tm_fill to specify variable, classification method, and give the map a title
+  tm_layout(legend.position = c("right", "bottom"),   #use tm_layout to make the legend look nice
+            legend.title.size = 0.8,
+            legend.text.size = 0.5)
+
+map2 <- tm_shape(manchester_lsoa) + 
+  tm_fill("count", style="jenks", title = "Jenks") +
+  tm_layout(legend.position = c("right", "bottom"), 
+            legend.title.size = 0.8,
+            legend.text.size = 0.5)
+
+map3 <- tm_shape(manchester_lsoa) + 
+  tm_fill("count", style="quantile", title = "Quantile") +
+  tm_layout(legend.position = c("right", "bottom"), 
+            legend.title.size = 0.8,
+            legend.text.size = 0.5)
+
+map4 <- tm_shape(manchester_lsoa) + 
+  tm_fill("count", style="cont", title = "Unclassed") +
+  tm_borders(alpha=0.1) +
+  tm_layout(legend.position = c("right", "bottom"), 
+            legend.title.size = 0.8,
+            legend.text.size = 0.5)
+
+map3
+
+#And now we deploy tmap_arrange to plot these maps together
+tmap_arrange(map1, map2, map3, map4) 
+
+tm_shape(manchester_lsoa) + 
+  tm_bubbles("count")
+
+tm_shape(manchester_lsoa) +                         #use tm_shape function to specify spatial object
+  tm_bubbles("count", border.lwd=NA) +              #use tm_bubbles to add the bubble visualisation, but set the 'border.lwd' parameter to NA, meaning no symbol borders are drawn
+  tm_borders(alpha=0.1) +                           #add the LSOA border outlines using tm_borders, but set their transparency using the alpha parameter (0 is totally transparent, 1 is not at all)
+  tm_layout(legend.position = c("right", "bottom"), #use tm_layout to make the legend look nice
+            legend.title.size = 0.8,
+            legend.text.size = 0.5)
+
+
+install.packages("readr")
+library(readr)
+census_lsoa_m <- read_csv("https://www.dropbox.com/s/e4nkqmefovlsvib/Data_AGE_APPSOCG_DAYPOP_UNIT_URESPOP.csv?dl=1")
+census_lsoa_m <- slice(census_lsoa_m, 3:284)
+
+census_lsoa_m <- select(census_lsoa_m, GEO_CODE, F996:F323339)
+census_lsoa_m[2:9] <- lapply(census_lsoa_m[2:9], as.numeric)
+census_lsoa_m <- rename(census_lsoa_m, tothouse = F996, notdepr = F997, depriv1 = F998,
+                        depriv2 = F999, depriv3 = F1000, depriv4 = F1001, respop = F2384,
+                        wkdpop = F323339)
+manchester_lsoa <- left_join(manchester_lsoa, census_lsoa_m, by = c("code"="GEO_CODE"))
+
+manchester_lsoa <- mutate(manchester_lsoa, crimr1 = (count/respop)*100000, crimr2 = (count/wkdpop)*100000)
+
+
+tmap_mode("plot")
+tm_shape(manchester_lsoa) + 
+  tm_polygons()
+tm_shape(manchester_lsoa) + 
+  tm_polygons("count")
+tm_shape(manchester_lsoa) + 
+  tm_fill("count")
+tm_shape(manchester_lsoa) + 
+  tm_fill("count") +
+  tm_borders(alpha = 0.1)
+tm_shape(manchester_lsoa) + 
+  tm_fill("count", title = "Crime counts") +
+  tm_borders(alpha = 0.1) +
+  tm_layout(main.title = "Crime in Manchester City, Nov/2017", main.title.size = 0.7 ,
+            legend.position = c("right", "bottom"), legend.title.size = 0.8)
+
+current_style <- tmap_style("col_blind")
+
+#workday pop - population
+map1 <- tm_shape(manchester_lsoa) +                   #use tm_shape function to specify spatial object
+  tm_fill("wkdpop", style="quantile", title = "Population") +  #use tm_fill to specify variable, classification method, and give the map a title
+  tm_layout(legend.position = c("right", "bottom"),   #use tm_layout to make the legend look nice
+            legend.title.size = 0.8,
+              legend.text.size = 0.5,
+            panel.labels = "Workday Population",
+            aes.palette = "red")
+
+map1
+
+#workday pop - crime rate
+map2 <- tm_shape(manchester_lsoa) + 
+  tm_fill("crimr2", style="quantile", title = "Crime Rate") +
+  tm_layout(legend.position = c("right", "bottom"), 
+            legend.title.size = 0.8,
+            legend.text.size = 0.5,
+            panel.labels = "Workday Population")
+
+map2
+
+#residentpop - population
+map3 <- tm_shape(manchester_lsoa) + 
+  tm_fill("respop", style="quantile", title = "Population") +
+  tm_layout(legend.position = c("right", "bottom"), 
+            legend.title.size = 0.8,
+            legend.text.size = 0.5,
+            panel.labels = "Residential Population")
+
+map3
+
+#residentpop - crime rate
+map4 <- tm_shape(manchester_lsoa) + 
+  tm_fill("crimr1", style="quantile", title = "Crime Rate") +
+  tm_borders(alpha=0.1) +
+  tm_layout(legend.position = c("right", "bottom"), 
+            legend.title.size = 0.8,
+            legend.text.size = 0.5,
+            panel.labels = "Residential Population")
+
+map4
+
+#And now we deploy tmap_arrange to plot these maps together
+tmap_arrange(map4, map2, map3, map1) 
+
+
+tmap_mode("view")
+map4
+
+crime_sf <- st_as_sf(x = crimes, 
+                     coords = c("Longitude", "Latitude"),
+                     crs = "+proj=longlat +datum=WGS84")
+#For a simple map with all the points
+
+tm_shape(crime_sf) + 
+  tm_dots() 
+
+tm_shape(crime_sf) + 
+  tm_dots(alpha=0.1) 
+
+install.packages("OpenStreetMap")
+library(OpenStreetMap)
+library(tmaptools)
+gm_osm <- read_osm(crime_sf)
+
+qtm(gm_osm) + 
+  tm_shape(crime_sf) + 
+  tm_dots(alpha=0.1) 
+
+mc_osm <- read_osm(manchester_lsoa, type = "stamen-toner")
+
+qtm(mc_osm) + 
+  tm_shape(crime_sf) + 
+  tm_dots(alpha=0.1) 
+
+#Create the bounding box
+UoM_bb <- bb("University of Manchester", width=.03, height=.02)
+#Read the basemap from using the stamen toner background
+UoM_osm <- read_osm(UoM_bb, type = "stamen-toner")
+#Plot the basemap
+qtm(UoM_osm)
+
+qtm(UoM_osm) + 
+  tm_shape(crime_sf) + 
+  tm_dots(size=0.5, col = "Crime.type") + 
+  tm_facets("Crime.type", free.coords=FALSE) +
+  tm_layout(legend.show=FALSE)
